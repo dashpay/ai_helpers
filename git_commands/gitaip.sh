@@ -14,11 +14,11 @@ if git ls-files -u | grep -q .; then
   exit 1
 fi
 
-# Add all modified (but unstaged) files
-MODIFIED=$(git ls-files -m)
-if [[ -n "$MODIFIED" ]]; then
-  echo "🔄 Staging modified files..."
-  git add -u
+# Add all modified or added files
+MODIFIED_OR_ADDED=$(git status --porcelain | grep -E '^( M|A |\?\?)' || true)
+if [[ -n "$MODIFIED_OR_ADDED" ]]; then
+  echo "🔄 Staging modified and added files..."
+  git add -A
 fi
 
 # Ensure staged changes exist
