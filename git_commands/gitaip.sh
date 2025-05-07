@@ -38,23 +38,60 @@ if [[ ! "$CURRENT_BRANCH" =~ ^(v[0-9]+-dev|master|develop)$ ]]; then
   fi
 fi
 
-read -p "📋 Would you like to use the advanced pull request template? (y/N/A for always): " use_template
-
 ADVANCED_TEMPLATE=false
-if [[ "$use_template" =~ ^[yY](es)?$ ]]; then
-  ADVANCED_TEMPLATE=true
-elif [[ "$use_template" =~ ^[aA]$ ]]; then
-  ADVANCED_TEMPLATE=true
-  echo "ADVANCED_TEMPLATE=true" > .gitaipconfig
-  # Ensure .gitaipconfig is ignored by Git
-  if [[ -f .gitignore && -w .gitignore ]]; then
-    if ! grep -q "^.gitaipconfig$" .gitignore; then
-      echo ".gitaipconfig" >> .gitignore
-      echo "📄 Added .gitaipconfig to .gitignore"
-    fi
+
+# First check if persisted config exists
+if [[ -f .gitaipconfig ]]; then
+  if grep -q "ADVANCED_TEMPLATE=true" .gitaipconfig; then
+    ADVANCED_TEMPLATE=true
+    echo "🧠 Loaded ADVANCED_TEMPLATE=true from .gitaipconfig"
+  elif grep -q "ADVANCED_TEMPLATE=false" .gitaipconfig; then
+    ADVANCED_TEMPLATE=false
+    echo "🧠 Loaded ADVANCED_TEMPLATE=false from .gitaipconfig"
   fi
-elif [[ -f .gitaipconfig && $(grep ADVANCED_TEMPLATE .gitaipconfig) == "ADVANCED_TEMPLATE=true" ]]; then
-  ADVANCED_TEMPLATE=true
+else
+
+  while true; do
+    read -p "📋 Would you like to use the advanced pull request template? (yes/no/always/never): " use_template
+
+    case "${use_template,,}" in  # convert to lowercase
+      yes|y)
+        ADVANCED_TEMPLATE=true
+        break
+        ;;
+      no|n)
+        ADVANCED_TEMPLATE=false
+        break
+        ;;
+      always)
+        ADVANCED_TEMPLATE=true
+        echo "ADVANCED_TEMPLATE=true" > .gitaipconfig
+        # Ensure .gitaipconfig is ignored by Git
+        if [[ -f .gitignore && -w .gitignore ]]; then
+          if ! grep -q "^.gitaipconfig$" .gitignore; then
+            echo ".gitaipconfig" >> .gitignore
+            echo "📄 Added .gitaipconfig to .gitignore"
+          fi
+        fi
+        break
+        ;;
+      never)
+        ADVANCED_TEMPLATE=false
+        echo "ADVANCED_TEMPLATE=false" > .gitaipconfig
+        # Ensure .gitaipconfig is ignored by Git
+        if [[ -f .gitignore && -w .gitignore ]]; then
+          if ! grep -q "^.gitaipconfig$" .gitignore; then
+            echo ".gitaipconfig" >> .gitignore
+            echo "📄 Added .gitaipconfig to .gitignore"
+          fi
+        fi
+        break
+        ;;
+      *)
+        echo "❌ Please answer yes, no, always, or never."
+        ;;
+    esac
+  done
 fi
 
 DIFF_LIMIT=8000
@@ -207,7 +244,30 @@ EOF
   case "$confirm" in
     y|Y|yes|YES)
       read -p "❗ Is this a breaking change? (y/N): " breaking
-      [[ "$breaking" =~ ^[yY]$ ]] && MESSAGE="${MESSAGE/:/:!}" || BODY=$(echo "$BODY" | sed 's/^## Breaking Changes.*/## Breaking Changes\nNone/')
+      if [[ "$breaking" =~ ^[yY]$ ]]; then
+        MESSAGE="${MESSAGE/:/:!}"
+      else
+        # Only update if the section does not already mention "None"
+        BODY=$(echo "$BODY" | awk '
+          BEGIN { in_section = 0 }
+          /^## Breaking Changes/ { print; in_section = 1; next }
+          in_section == 1 {
+            if ($0 ~ /^None$/) {
+              in_section = 0
+              print
+              next
+            } else if ($0 ~ /^## /) {
+              print "None"
+              print
+              in_section = 0
+              next
+            } else {
+              next
+            }
+          }
+          { print }
+        ')
+      fi
       break
       ;;
     n|N|no|NO)
