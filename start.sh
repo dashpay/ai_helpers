@@ -62,12 +62,12 @@ echo "$KEYCHAIN_SNIPPET" >> "$SHELL_CONFIG"
 echo "OPENAI_API_KEY registered in $SHELL_CONFIG."
 
 # Check if alias is already present
-if grep -q "alias aip=" "$SHELL_CONFIG"; then
-  echo "Existing 'aip' alias found in $SHELL_CONFIG."
+if grep -q "alias gitaip=" "$SHELL_CONFIG"; then
+  echo "Existing 'gitaip' alias found in $SHELL_CONFIG."
   read -p "Do you want to update it? [y/N] " choice
   case "$choice" in
     y|Y )
-      sed -i.bak "/alias aip=/d" "$SHELL_CONFIG"
+      sed -i.bak "/alias gitaip=/d" "$SHELL_CONFIG"
       ;;
     * )
       echo "Leaving existing alias unchanged."
@@ -77,8 +77,8 @@ if grep -q "alias aip=" "$SHELL_CONFIG"; then
 fi
 
 # Register alias
-echo "alias aip='bash $(pwd)/$AIP_SCRIPT'" >> "$SHELL_CONFIG"
-echo "aip alias registered in $SHELL_CONFIG."
+echo "alias gitaip='bash $(pwd)/$AIP_SCRIPT'" >> "$SHELL_CONFIG"
+echo "gitaip alias registered in $SHELL_CONFIG."
 
 # Advise to reload shell
 echo "To apply changes, run:"
