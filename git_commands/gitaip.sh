@@ -160,20 +160,36 @@ EOF
 
   OUTPUT=$(echo "$HTTP_BODY" | jq -r '.choices[0].message.content // empty')
 
-  # Get branch name
+  # Extract branch name
   BRANCH=$(echo "$OUTPUT" | awk '
-    /^[Bb]ranch name:/ {
-      match($0, /^[Bb]ranch name:[[:space:]]*(.*)/, m);
-      if (m[1] != "") { print m[1]; exit }
-      else { getline; print; exit }
+    tolower($0) ~ /^branch name:/ {
+      val = substr($0, index($0, ":") + 1)
+      gsub(/^[ \t]+/, "", val)
+      if (length(val) > 0) {
+        print val
+        exit
+      }
+      else {
+        getline
+        print
+        exit
+      }
     }' | xargs)
 
-  # Get commit message
+  # Extract commit message
   MESSAGE=$(echo "$OUTPUT" | awk '
-    /^[Cc]ommit message:/ {
-      match($0, /^[Cc]ommit message:[[:space:]]*(.*)/, m);
-      if (m[1] != "") { print m[1]; exit }
-      else { getline; print; exit }
+    tolower($0) ~ /^commit message:/ {
+      val = substr($0, index($0, ":") + 1)
+      gsub(/^[ \t]+/, "", val)
+      if (length(val) > 0) {
+        print val
+        exit
+      }
+      else {
+        getline
+        print
+        exit
+      }
     }' | xargs)
   BODY=$(echo "$OUTPUT" | awk '/^[Pp][Rr] [Bb]ody:/ {flag=1; next} flag')
 
