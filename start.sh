@@ -1,7 +1,36 @@
 #!/bin/bash
 
 echo "Welcome to aip setup"
-read -p "Enter your OpenAI API key: " OPENAI_API_KEY
+
+# Check if an API key is already set
+EXISTING_KEY=""
+if [[ -n "$OPENAI_API_KEY" ]]; then
+  EXISTING_KEY="$OPENAI_API_KEY"
+elif [[ "$(uname)" == "Darwin" ]]; then
+  EXISTING_KEY=$(security find-generic-password -a "$USER" -s "OPENAI_API_KEY" -w 2>/dev/null || true)
+fi
+
+if [[ -n "$EXISTING_KEY" ]]; then
+  echo "Found existing OpenAI API key."
+  while true; do
+    read -p "Do you want to use the existing key? [Y/n]: " reuse
+    case "$reuse" in
+      [Yy]|"")  # Accept "Y", "y", or empty input (default yes)
+        OPENAI_API_KEY="$EXISTING_KEY"
+        break
+        ;;
+      [Nn])
+        read -p "Enter your new OpenAI API key: " OPENAI_API_KEY
+        break
+        ;;
+      *)
+        echo "Please answer Y or N."
+        ;;
+    esac
+  done
+else
+  read -p "Enter your OpenAI API key: " OPENAI_API_KEY
+fi
 
 # Inject the API key into aip.sh
 AIP_SCRIPT="git_commands/gitaip.sh"
@@ -42,14 +71,24 @@ fi
 
 # Offer macOS Keychain integration
 if [[ "$OS_TYPE" == "Darwin" ]]; then
-  echo "Would you like to store your API key securely in macOS Keychain? [Y/n]"
-  read -r use_keychain
-  if [[ "$use_keychain" =~ ^[Yy]$ || -z "$use_keychain" ]]; then
-    security add-generic-password -a "$USER" -s "OPENAI_API_KEY" -w "$OPENAI_API_KEY" -U
-    KEYCHAIN_SNIPPET='export OPENAI_API_KEY="$(security find-generic-password -a "$USER" -s "OPENAI_API_KEY" -w)"'
-  else
-    KEYCHAIN_SNIPPET="export OPENAI_API_KEY=\"$OPENAI_API_KEY\""
-  fi
+  while true; do
+    echo "Would you like to store your API key securely in macOS Keychain? [Y/n]"
+    read -r use_keychain
+    case "$use_keychain" in
+      [Yy]|"")
+        security add-generic-password -a "$USER" -s "OPENAI_API_KEY" -w "$OPENAI_API_KEY" -U
+        KEYCHAIN_SNIPPET='export OPENAI_API_KEY="$(security find-generic-password -a "$USER" -s "OPENAI_API_KEY" -w)"'
+        break
+        ;;
+      [Nn])
+        KEYCHAIN_SNIPPET="export OPENAI_API_KEY=\"$OPENAI_API_KEY\""
+        break
+        ;;
+      *)
+        echo "Please answer Y or N."
+        ;;
+    esac
+  done
 else
   KEYCHAIN_SNIPPET="export OPENAI_API_KEY=\"$OPENAI_API_KEY\""
 fi
