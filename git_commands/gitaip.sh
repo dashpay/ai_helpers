@@ -54,7 +54,7 @@ else
   while true; do
     read -p "📋 Would you like to use the advanced pull request template? (yes/no/always/never): " use_template
 
-    case "${use_template,,}" in  # convert to lowercase
+    case "$(echo "$use_template" | tr '[:upper:]' '[:lower:]')" in
       yes|y)
         ADVANCED_TEMPLATE=true
         break
@@ -94,9 +94,9 @@ else
   done
 fi
 
-DIFF_LIMIT=8000
+DIFF_LIMIT=50000
 GIT_DIFF=$(git diff --cached)
-DIFF_SIZE=$(echo "$GIT_DIFF" | wc -c)
+DIFF_SIZE=$(echo "$GIT_DIFF" | wc -w)
 
 if [ "$DIFF_SIZE" -lt "$DIFF_LIMIT" ]; then
   CONTEXT="Diff:
@@ -107,12 +107,16 @@ else
   CONTEXT="Changed files:
 $FILES
 
+Diff size is $DIFF_SIZE
+
 Method definitions:
 $METHODS"
 fi
 
 if $ADVANCED_TEMPLATE; then
-PROMPT="You are an expert software engineer writing for a git tool.
+PROMPT="You are an expert software engineer writing for a git tool. Your style is straight to the point,
+you should not say things like This PR introduces a list of comprehensive updates, and instead just give the updates.
+You should not talk about code readability improvements unless that is all there is in the diff.
 
 Your job is to:
 1. Suggest a short and descriptive **branch name**, lowercase with dashes (e.g., feat/add-minting-check).
@@ -145,7 +149,9 @@ PR Body:
 
 $CONTEXT"
 else
-  PROMPT="You are an expert software engineer writing for a git tool.
+  PROMPT="You are an expert software engineer writing for a git tool. Your style is straight to the point,
+          you should not say things like This PR introduces a list of comprehensive updates, and instead just give the updates.
+          You should not talk about code readability improvements unless that is all there is in the diff.
 
   Your job is to:
   1. Suggest a short and descriptive **branch name**, lowercase with dashes (e.g., feat/add-minting-check).
@@ -178,7 +184,7 @@ while true; do
     -H "Content-Type: application/json" \
     -d @- <<EOF
 {
-  "model": "gpt-4o",
+  "model": "gpt-4o-mini",
   "messages": [{"role": "user", "content": $(jq -Rs '.' <<< "$FINAL_PROMPT")}],
   "temperature": 0.4
 }
@@ -240,7 +246,7 @@ EOF
   echo "📝 Commit Message: $MESSAGE"
   echo -e "📝 PR Body:\n$BODY"
 
-  read -p "❓ Is this okay? (y/n/feedback): " confirm
+  read -p "❓ Is this okay? (y/n/feedback/see_prompt): " confirm
   case "$confirm" in
     y|Y|yes|YES)
       read -p "❗ Is this a breaking change? (y/N): " breaking
@@ -273,6 +279,14 @@ EOF
     n|N|no|NO)
       echo "Aborted by user."
       exit 1
+      ;;
+    see_prompt)
+      echo "📄 Prompt sent to OpenAI:"
+      echo "----------------------------------------"
+      echo "$PROMPT"
+      echo "----------------------------------------"
+      # After viewing, re-prompt for feedback
+      read -p "💬 Enter feedback or press Enter to continue: " feedback
       ;;
     *)
       feedback="$confirm"
