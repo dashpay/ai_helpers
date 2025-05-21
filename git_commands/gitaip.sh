@@ -117,10 +117,11 @@ if $ADVANCED_TEMPLATE; then
 PROMPT="You are an expert software engineer writing for a git tool. Your style is straight to the point,
 you should not say things like This PR introduces a list of comprehensive updates, and instead just give the updates.
 You should not talk about code readability improvements unless that is all there is in the diff.
+Try to figure out the overarching goal of the diffs, outside of smaller refactorings.
 
 Your job is to:
-1. Suggest a short and descriptive **branch name**, lowercase with dashes (e.g., feat/add-minting-check).
-2. Suggest a semantic **commit message** starting with a prefix like feat:, fix:, refactor:, etc.
+1. Suggest a short and descriptive **branch name**, lowercase with dashes (e.g., feat/add-minting-check). You should always propose a branch name that follows semantic PRs. For example it should start with feat/ or fix/ or refactor/ or chore/
+2. Suggest a semantic **commit message** starting with a prefix like feat:, fix:, refactor:, chore:, etc.
 3. Provide a concise **PR body** explaining what changed and why.
 
 Format your PR body with the following (but don't include what's in parenthesis):
@@ -139,7 +140,7 @@ Format your PR body with the following (but don't include what's in parenthesis)
 
 Format:
 Branch name:
-<branch>
+<branch> (do not leave <branch>)
 
 Commit message:
 <semantic commit message>
@@ -152,15 +153,16 @@ else
   PROMPT="You are an expert software engineer writing for a git tool. Your style is straight to the point,
           you should not say things like This PR introduces a list of comprehensive updates, and instead just give the updates.
           You should not talk about code readability improvements unless that is all there is in the diff.
+	  Try to figure out the overarching goal of the diffs, outside of smaller refactorings.
 
   Your job is to:
-  1. Suggest a short and descriptive **branch name**, lowercase with dashes (e.g., feat/add-minting-check).
+  1. Suggest a short and descriptive **branch name**, lowercase with dashes (e.g., feat/add-minting-check). You should always propose a branch name that follows semantic PRs. For example it should start with feat/ or fix/ or refactor/ or chore/.
   2. Suggest a semantic **commit message** starting with a prefix like feat:, fix:, refactor:, etc.
   3. Provide a concise **PR body** explaining what changed and why.
 
   Format:
   Branch name:
-  <branch>
+  <branch> (do not leave <branch>)
 
   Commit message:
   <semantic commit message>
@@ -249,9 +251,9 @@ EOF
   read -p "❓ Is this okay? (y/n/feedback/see_prompt): " confirm
   case "$confirm" in
     y|Y|yes|YES)
-      read -p "❗ Is this a breaking change? (y/N): " breaking
+      read -p "❗ Is this a breaking change? (y/n): " breaking
       if [[ "$breaking" =~ ^[yY]$ ]]; then
-        MESSAGE="${MESSAGE/:/:!}"
+        MESSAGE="${MESSAGE/:/!:}"
       else
         # Only update if the section does not already mention "None"
         BODY=$(echo "$BODY" | awk '
