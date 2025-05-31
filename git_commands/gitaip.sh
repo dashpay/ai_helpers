@@ -343,4 +343,8 @@ if [[ "$AUTOMERGE" == "true" ]]; then
   echo "🔄 Auto-merging PR..."
   gh pr merge "$PR_URL" --auto --merge
   echo "✅ PR set to auto-merge once all checks pass"
+  echo "🔄 Switching back to original branch: $CURRENT_BRANCH"
+  git checkout "$CURRENT_BRANCH"
+  echo "🔄 Pulling latest changes from origin..."
+  git pull origin "$CURRENT_BRANCH"
 fi
