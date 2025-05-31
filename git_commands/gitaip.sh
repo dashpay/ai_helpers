@@ -2,9 +2,13 @@
 
 set -e
 
-# Ensure API key is present
-if [[ -z "$OPENAI_API_KEY" ]]; then
-  echo "Error: OPENAI_API_KEY is not set"
+# Determine which AI provider to use
+AI_PROVIDER="openai"
+if [[ -n "$ANTHROPIC_API_KEY" ]]; then
+  AI_PROVIDER="claude"
+elif [[ -z "$OPENAI_API_KEY" ]]; then
+  echo "Error: Neither ANTHROPIC_API_KEY nor OPENAI_API_KEY is set"
+  echo "Please set one of these environment variables to use this tool"
   exit 1
 fi
 
@@ -181,29 +185,51 @@ while true; do
   FINAL_PROMPT="$PROMPT"
   [[ -n "$feedback" ]] && FINAL_PROMPT+="\n\nUser feedback: $feedback"
 
-  RESPONSE=$(curl -sS -w "\n%{http_code}" https://api.openai.com/v1/chat/completions \
-    -H "Authorization: Bearer $OPENAI_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d @- <<EOF
+  if [[ "$AI_PROVIDER" == "claude" ]]; then
+    echo "🤖 Using Claude API..."
+    RESPONSE=$(curl -sS -w "\n%{http_code}" https://api.anthropic.com/v1/messages \
+      -H "x-api-key: $ANTHROPIC_API_KEY" \
+      -H "anthropic-version: 2023-06-01" \
+      -H "Content-Type: application/json" \
+      -d @- <<EOF
+{
+  "model": "claude-3-5-haiku-20241022",
+  "max_tokens": 30000,
+  "temperature": 0.4,
+  "messages": [{"role": "user", "content": $(jq -Rs '.' <<< "$FINAL_PROMPT")}]
+}
+EOF
+    )
+  else
+    echo "🤖 Using OpenAI API..."
+    RESPONSE=$(curl -sS -w "\n%{http_code}" https://api.openai.com/v1/chat/completions \
+      -H "Authorization: Bearer $OPENAI_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d @- <<EOF
 {
   "model": "gpt-4o-mini",
   "messages": [{"role": "user", "content": $(jq -Rs '.' <<< "$FINAL_PROMPT")}],
   "temperature": 0.4
 }
 EOF
-  )
+    )
+  fi
 
   HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
   HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 
   if [[ "$HTTP_CODE" -ne 200 ]]; then
-    echo "❌ OpenAI API request failed with status $HTTP_CODE"
+    echo "❌ API request failed with status $HTTP_CODE"
     echo "➡️ Response body:"
     echo "$HTTP_BODY"
     exit 1
   fi
 
-  OUTPUT=$(echo "$HTTP_BODY" | jq -r '.choices[0].message.content // empty')
+  if [[ "$AI_PROVIDER" == "claude" ]]; then
+    OUTPUT=$(echo "$HTTP_BODY" | jq -r '.content[0].text // empty')
+  else
+    OUTPUT=$(echo "$HTTP_BODY" | jq -r '.choices[0].message.content // empty')
+  fi
 
   # Extract branch name
   BRANCH=$(echo "$OUTPUT" | awk '
@@ -314,7 +340,7 @@ EOF
       exit 1
       ;;
     see_prompt)
-      echo "📄 Prompt sent to OpenAI:"
+      echo "📄 Prompt sent to $AI_PROVIDER:"
       echo "----------------------------------------"
       echo "$PROMPT"
       echo "----------------------------------------"
