@@ -248,9 +248,40 @@ EOF
   echo "📝 Commit Message: $MESSAGE"
   echo -e "📝 PR Body:\n$BODY"
 
-  read -p "❓ Is this okay? (y/n/feedback/see_prompt): " confirm
+  read -p "❓ Is this okay? (y/n/a for autoaccept/feedback/see_prompt): " confirm
   case "$confirm" in
     y|Y|yes|YES)
+      AUTOMERGE=false
+      read -p "❗ Is this a breaking change? (y/n): " breaking
+      if [[ "$breaking" =~ ^[yY]$ ]]; then
+        MESSAGE="${MESSAGE/:/:!}"
+      else
+        # Only update if the section does not already mention "None"
+        BODY=$(echo "$BODY" | awk '
+          BEGIN { in_section = 0 }
+          /^## Breaking Changes/ { print; in_section = 1; next }
+          in_section == 1 {
+            if ($0 ~ /^None$/) {
+              in_section = 0
+              print
+              next
+            } else if ($0 ~ /^## /) {
+              print "None"
+              print
+              in_section = 0
+              next
+            } else {
+              next
+            }
+          }
+          { print }
+        ')
+      fi
+      break
+      ;;
+    a|A|autoaccept)
+      AUTOMERGE=true
+      echo "✅ Auto-accept enabled. PR will be automatically merged after creation."
       read -p "❗ Is this a breaking change? (y/n): " breaking
       if [[ "$breaking" =~ ^[yY]$ ]]; then
         MESSAGE="${MESSAGE/:/!:}"
@@ -302,5 +333,14 @@ echo "✅ Using commit message: $MESSAGE"
 git commit -m "$MESSAGE"
 git push origin "$BRANCH_SANITIZED"
 
-gh pr create --base "$CURRENT_BRANCH" --head "$BRANCH_SANITIZED" --title "$MESSAGE" --body "$BODY"
+PR_URL=$(gh pr create --base "$CURRENT_BRANCH" --head "$BRANCH_SANITIZED" --title "$MESSAGE" --body "$BODY")
 echo "✅ PR created targeting $CURRENT_BRANCH from $BRANCH_SANITIZED"
+echo "📎 PR URL: $PR_URL"
+
+if [[ "$AUTOMERGE" == "true" ]]; then
+  echo "⏳ Waiting a moment before auto-merging..."
+  sleep 2
+  echo "🔄 Auto-merging PR..."
+  gh pr merge "$PR_URL" --auto --merge
+  echo "✅ PR set to auto-merge once all checks pass"
+fi
