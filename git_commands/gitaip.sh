@@ -18,11 +18,25 @@ if git ls-files -u | grep -q .; then
   exit 1
 fi
 
-# Add all modified or added files
-MODIFIED_OR_ADDED=$(git status --porcelain | grep -E '^( M|A |\?\?)' || true)
-if [[ -n "$MODIFIED_OR_ADDED" ]]; then
-  echo "🔄 Staging modified and added files..."
-  git add -A
+# Check for modified/added files and untracked files separately
+MODIFIED=$(git status --porcelain | grep -E '^( M|A )' || true)
+UNTRACKED=$(git status --porcelain | grep -E '^\?\?' || true)
+
+# Stage modified files
+if [[ -n "$MODIFIED" ]]; then
+  echo "🔄 Staging modified files..."
+  git add -u
+fi
+
+# Ask about untracked files
+if [[ -n "$UNTRACKED" ]]; then
+  echo "📁 Found untracked files:"
+  echo "$UNTRACKED" | awk '{print "   " $2}'
+  read -p "❓ Do you want to add these untracked files? (y/n): " add_untracked
+  if [[ "$add_untracked" =~ ^[yY]$ ]]; then
+    echo "🔄 Adding untracked files..."
+    echo "$UNTRACKED" | awk '{print $2}' | xargs git add
+  fi
 fi
 
 # Ensure staged changes exist
